@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <file:connector name="File" readFromDirectory="D:\readFile" workDirectory="D:\workFile" autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    <db:mysql-config name="MySQL_Configuration" host="mudb.mulesoft-training.com" port="3306" user="mule" password="mule" database="training" doc:name="MySQL Configuration"/>
+    <file:connector name="File1" outputPattern="FlightsDB.csv" writeToDirectory="D:\workFile" autoDelete="false" outputAppend="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <flow name="mule-file-db-file-pocFlow">
+        <file:inbound-endpoint path="D:\readFile" connector-ref="File" responseTimeout="10000" doc:name="File"/>
+        <file:file-to-string-transformer mimeType="text/csv" metadata:id="a1747b44-b314-4c76-a31c-635c3b42f03e" doc:name="File to String"/>
+        <foreach collection="#[payload.split('\n')]" doc:name="For Each">
+            <set-payload value="#[payload]" doc:name="Set Payload"/>
+            <logger message="#[payload] lines" level="INFO" doc:name="Logger"/>
+            <foreach collection="#[payload.split(',')]" doc:name="For Each">
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.counter==2]">
+                        <set-variable variableName="id" value="#[payload]" doc:name="set ID"/>
+                        <db:select config-ref="MySQL_Configuration" doc:name="Database">
+                            <db:parameterized-query><![CDATA[Select * from american where ID = #[flowVars.id]]]></db:parameterized-query>
+                        </db:select>
+                        <json:object-to-json-transformer doc:name="Object to JSON"/>
+                        <file:outbound-endpoint path="D:\workFile" connector-ref="File1" responseTimeout="10000" doc:name="File"/>
+                    </when>
+                    <otherwise>
+                        <logger message="should not be sent to db" level="INFO" doc:name="Logger"/>
+                    </otherwise>
+                </choice>
+                <logger message="#[flowVars.id]" level="INFO" doc:name="Logger"/>
+            </foreach>
+        </foreach>
+    </flow>
+</mule>
